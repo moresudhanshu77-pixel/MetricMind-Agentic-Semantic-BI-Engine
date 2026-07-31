@@ -93,6 +93,26 @@ def query_cube(query):
     response.raise_for_status()
     return response.json()
 
+def explain_result(user_question, cube_query, result_data):
+    """Ask the LLM to explain the query result in plain, executive-friendly English."""
+    explanation_prompt = f"""You are a financial analyst presenting data to an executive.
+
+The user asked: "{user_question}"
+
+You ran this governed query: {json.dumps(cube_query)}
+
+The data returned was: {json.dumps(result_data)}
+
+Write a clear, concise explanation (3-5 sentences) of what this data shows. 
+Use plain English, mention specific numbers, and highlight any notable patterns 
+(e.g., which category/status has the highest or lowest values). 
+Do not make up any numbers not present in the data. 
+Do not mention SQL, JSON, or technical implementation details — 
+speak like you're briefing a business executive.
+"""
+
+    response = llm.invoke([HumanMessage(content=explanation_prompt)])
+    return response.content
 
 if __name__ == "__main__":
     question = "What is our total revenue and margin percentage by order status?"
@@ -105,5 +125,13 @@ if __name__ == "__main__":
     print()
 
     result = query_cube(cube_query)
-    print("Result from Cube.dev:")
-    print(json.dumps(result.get("data", []), indent=2))
+    result_data = result.get("data", [])
+    print("Raw data from Cube.dev:")
+    print(json.dumps(result_data, indent=2))
+    print()
+
+    explanation = explain_result(question, cube_query, result_data)
+    print("=" * 60)
+    print("MetricMind's Answer:")
+    print("=" * 60)
+    print(explanation)

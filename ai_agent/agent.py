@@ -114,6 +114,70 @@ speak like you're briefing a business executive.
     response = llm.invoke([HumanMessage(content=explanation_prompt)])
     return response.content
 
+def classify_question(user_question):
+    """Ask the LLM whether this question requires deeper root-cause investigation."""
+    classify_prompt = f"""Classify this business question into ONE category:
+
+"simple" - asking for a direct number or breakdown (e.g. "what is revenue by status")
+"investigative" - asking WHY something happened, or about a change/drop/increase 
+(e.g. "why did margin drop", "why are margins low", "what caused the decline")
+
+Question: "{user_question}"
+
+Respond with ONLY the word "simple" or "investigative", nothing else.
+"""
+    response = llm.invoke([HumanMessage(content=classify_prompt)])
+    return response.content.strip().lower()
+
+
+def investigate_root_cause(user_question):
+    """
+    For investigative questions: run the main order-level query first,
+    then automatically run a category-level breakdown to find the root cause.
+    """
+    # Step 1: get the overall picture (order-level margin)
+    overview_query = {
+        "measures": ["fct_orders.total_revenue", "fct_orders.total_estimated_margin", "fct_orders.margin_pct"],
+        "dimensions": ["fct_orders.order_status"]
+    }
+    overview_result = query_cube(overview_query)
+    overview_data = overview_result.get("data", [])
+
+    # Step 2: automatically drill into category-level breakdown to find root cause
+    breakdown_query = {
+        "measures": ["fct_order_items.total_revenue", "fct_order_items.total_margin", "fct_order_items.margin_pct"],
+        "dimensions": ["fct_order_items.product_category"]
+    }
+    breakdown_result = query_cube(breakdown_query)
+    breakdown_data = breakdown_result.get("data", [])
+
+    # Step 3: ask the LLM to synthesize both results into a root-cause explanation
+    synthesis_prompt = f"""You are a financial analyst investigating a business question for an executive.
+
+Question: "{user_question}"
+
+Overall order-level data:
+{json.dumps(overview_data)}
+
+Category-level breakdown (used to find the root cause):
+{json.dumps(breakdown_data)}
+
+Write a clear root-cause analysis (4-6 sentences). Identify which category or 
+categories have the lowest margin percentage, since those are likely dragging 
+down the overall numbers. Compare them to the highest-performing categories 
+for contrast. Use only the real numbers provided — never invent data. 
+Speak like you're briefing an executive, no technical jargon.
+"""
+    response = llm.invoke([HumanMessage(content=synthesis_prompt)])
+
+    return {
+        "overview_query": overview_query,
+        "overview_data": overview_data,
+        "breakdown_query": breakdown_query,
+        "breakdown_data": breakdown_data,
+        "explanation": response.content
+    }
+
 if __name__ == "__main__":
     question = "What is our total revenue and margin percentage by order status?"
 

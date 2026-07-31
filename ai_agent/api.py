@@ -2,6 +2,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agent import ask_llm_for_query, query_cube, explain_result, classify_question, investigate_root_cause
+import time
+from collections import defaultdict
+
+# Simple in-memory rate limiter: max 10 requests per minute per session
+request_log = defaultdict(list)
+RATE_LIMIT = 10
+RATE_WINDOW_SECONDS = 60
+
+def check_rate_limit(client_id="default"):
+    now = time.time()
+    request_log[client_id] = [t for t in request_log[client_id] if now - t < RATE_WINDOW_SECONDS]
+    if len(request_log[client_id]) >= RATE_LIMIT:
+        return False
+    request_log[client_id].append(now)
+    return True
 
 app = FastAPI(title="MetricMind Agent API")
 
@@ -19,6 +34,9 @@ class QuestionRequest(BaseModel):
 
 @app.post("/ask")
 def ask(request: QuestionRequest):
+    if not check_rate_limit():
+        return {"error": "Rate limit exceeded. Please wait a moment before asking again."}
+
     question = request.question
 
     classification = classify_question(question)

@@ -79,19 +79,35 @@ Do not include any explanation, markdown formatting, or extra text — just the 
     return json.loads(raw)
 
 
+# Cost governance: hard limits to prevent expensive, unbounded queries
+MAX_ROW_LIMIT = 1000
+REQUEST_TIMEOUT_SECONDS = 10
+
 def query_cube(query):
-    """Send a query to Cube.dev's REST API and return the result."""
+    """Send a query to Cube.dev's REST API and return the result, with cost guardrails."""
+    
+    # Enforce a hard row limit on every query, regardless of what the LLM generated
+    query["limit"] = min(query.get("limit", MAX_ROW_LIMIT), MAX_ROW_LIMIT)
+
     headers = {
         "Authorization": f"Bearer {CUBE_API_TOKEN}",
         "Content-Type": "application/json"
     }
-    response = requests.get(
-        f"{CUBE_API_URL}/load",
-        params={"query": json.dumps(query)},
-        headers=headers
-    )
-    response.raise_for_status()
-    return response.json()
+
+    try:
+        response = requests.get(
+            f"{CUBE_API_URL}/load",
+            params={"query": json.dumps(query)},
+            headers=headers,
+            timeout=REQUEST_TIMEOUT_SECONDS
+        )
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.Timeout:
+        return {"error": "Query took too long and was stopped to control costs. Try a narrower question.", "data": []}
+    except requests.exceptions.HTTPError as e:
+        return {"error": f"Query failed: {str(e)}", "data": []}
 
 def explain_result(user_question, cube_query, result_data):
     """Ask the LLM to explain the query result in plain, executive-friendly English."""

@@ -1,18 +1,15 @@
-# MetricMind - Semantic BI Engine
+Welcome to your new dbt project!
 
-## Project Overview
-MetricMind is an AI-powered Semantic BI platform using:
-- MySQL
-- Cube.dev
-- LangChain
-- Llama 3
-- Next.js
-- ECharts
+### Using the starter project
 
-## Progress
+Try running the following commands:
+- dbt run
+- dbt test
 
-### Day 1
-- Selected Olist E-commerce Dataset
-- Reduced dataset to 1000 records for development
-- Created MySQL database
-- Started importing tables into MySQL Workbench
+
+### Resources:
+- Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
+- Check out [Discourse](https://discourse.getdbt.com/) for commonly asked questions and answers
+- Join the [dbt community](https://getdbt.com/community) to learn from other analytics engineers
+- Find [dbt events](https://events.getdbt.com) near you
+- Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
